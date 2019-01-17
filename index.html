@@ -1,49 +1,653 @@
 <!doctype html>
 <html>
-	<head>
-		<meta charset="utf-8">
-		<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
 
-		<title>reveal.js</title>
+    <title>Given this, assert that: fluent testing using fixtures and properties</title>
 
-		<link rel="stylesheet" href="css/reveal.css">
-		<link rel="stylesheet" href="css/theme/black.css">
+    <link rel="stylesheet" href="css/reveal.css">
+    <link rel="stylesheet" href="css/theme/serif.css">
 
-		<!-- Theme used for syntax highlighting of code -->
-		<link rel="stylesheet" href="lib/css/zenburn.css">
+    <!-- Theme used for syntax highlighting of code -->
+    <link rel="stylesheet" href="lib/css/zenburn.css">
+    <style>
+      .pointover {
+        position: absolute;
+        background: rgba(255, 255, 255, 0.9);
+        color: black;
+      }
+    </style>
 
-		<!-- Printing and PDF exports -->
-		<script>
-			var link = document.createElement( 'link' );
-			link.rel = 'stylesheet';
-			link.type = 'text/css';
-			link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
-			document.getElementsByTagName( 'head' )[0].appendChild( link );
-		</script>
-	</head>
-	<body>
-		<div class="reveal">
-			<div class="slides">
-				<section>Slide 1</section>
-				<section>Slide 2</section>
-			</div>
-		</div>
+    <!-- Printing and PDF exports -->
+    <script>
+      var link = document.createElement( 'link' );
+      link.rel = 'stylesheet';
+      link.type = 'text/css';
+      link.href = window.location.search.match( /print-pdf/gi ) ? 'css/print/pdf.css' : 'css/print/paper.css';
+      document.getElementsByTagName( 'head' )[0].appendChild( link );
+    </script>
+  </head>
+  <body>
+    <div class="reveal">
+      <div class="slides">
+        <section>
+          <h3>Given this, assert that:</h3>
+          <h4>fluent testing using fixtures and properties</h4>
+          <br/>
+          <p>PyCascades 2019</p>
+          <p>Paul Watts</p>
+          <p>
+            <small>
+              <img src="img/GitHub-Mark-32px.png" style="border: none; box-shadow: none; margin: 0;">
+              <a href="https://github.com/paulcwatts">@paulcwatts</a>
+              <img src="img/Twitter_Logo_Blue.svg" style="border: none; box-shadow: none; width: 32px; margin: 0;">
+              <a href="https://twitter.com/joulespersecond">@joulespersecond</a>
+            </small>
+          </p>
+          <aside class="notes">
+            I am grateful to be given the most coveted time slot,
+            the "second day, just before lunch" slot to talk to you about everyone's
+            favorite subject, software testing.
+          </aside>
+        </section>
+        <section>
+          <h3>Who am I?</h3>
+          <img src="img/IMG_1014.jpg" style="width: 400px;">
+        </section>
+        <section>
+          <h3>Reducing boilerplate<br/>using pytest fixtures</h3>
+        </section>
+        <section>
+          <img data-src="img/pytest1.png" style="border: none; padding: 10px; background: white; width: 300px;"/>
+          <aside class="notes">
+            Note: show of hands:
+            How many have heard of pytest?
+            How many people use pytest?
+          </aside>
+        </section>
+        <section>
+          <p><strong>pytest</strong> is a test runner and framework<br/>for creating better tests</p>
+          <br/>
+          <p>pytest <strong>fixtures</strong> are functions<br/>to help you reuse test setup logic</p>
+        </section>
+        <section>
+          <h3>Example of a fixture</h3>
+          <pre><code data-trim data-noescape>
+import pytest
 
-		<script src="lib/js/head.min.js"></script>
-		<script src="js/reveal.js"></script>
+@pytest.fixture
+def smtp_connection():
+    import smtplib
+    return smtplib.SMTP("smtp.gmail.com", 587, timeout=5)
 
-		<script>
-			// More info about config & dependencies:
-			// - https://github.com/hakimel/reveal.js#configuration
-			// - https://github.com/hakimel/reveal.js#dependencies
-			Reveal.initialize({
-				dependencies: [
-					{ src: 'plugin/markdown/marked.js' },
-					{ src: 'plugin/markdown/markdown.js' },
-					{ src: 'plugin/notes/notes.js', async: true },
-					{ src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
-				]
-			});
-		</script>
-	</body>
+def test_ehlo(smtp_connection):
+    response, msg = smtp_connection.ehlo()
+    assert response == 250
+  </code></pre>
+          <aside class="notes">
+            This is the example out of pytest's documentation:
+            a fixture is just a decorated function that returns
+            does some setup and returns the fixture object.
+
+            To use a fixture, just use the name of the fixture as a
+            parameter to your test function -- pytest will call the
+            fixture and pass the fixture object as the parameter.
+          </aside>
+        </section>
+        <section>
+          <h3>Real world example</h3>
+          <h4>Testing API methods</h4>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+class WidgetTestCase(APITestCase):
+    def test_get(self):
+        """
+        Test you can get a widget.
+        """
+        widget = Widget.objects.create(name="my widget")
+        user = User.objects.create_user("test")
+        self.client.force_authenticate(user)
+
+        response = self.client.get(f"/api/widgets/{widget.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()
+        self.assertEqual(detail["name"], "my widget")
+  </code></pre>
+          <aside class="notes">
+            Even in this simple example,
+            you need to create a widget, create a user, authenticate the client,
+            If you have multiple tests (and you surely do)
+            then you need to repeat the same process for each test.
+
+            Sure, you can use setUp() and tearDown(), but if you have
+            a lot of tests (and you hopefully do), you can also end up
+            either doing too much setup, or it becomes tricky to re-use
+            setup across tests classes -- you end up having to have test
+            base classes, or mixins or something more complex.
+          </aside>
+        </section>
+        <section>
+          <h3>AAA Pattern: Arrange, act, assert</h3>
+          <p>
+            <a href="https://simplabs.com/blog/2017/09/17/magic-test-data.html">
+              https://simplabs.com/blog/2017/09/17/magic-test-data.html
+            </a>
+          </p>
+        </section>
+        <section>
+          <div style="position: relative;">
+            <pre><code data-trim data-noescape>
+class WidgetTestCase(APITestCase):
+    def test_get(self):
+        """
+        Test you can get a widget.
+        """
+        widget = Widget.objects.create(name="my widget")
+        user = User.objects.create_user("test")
+        self.client.force_authenticate(user)
+
+        response = self.client.get(f"/api/widgets/{widget.pk}")
+
+        self.assertEqual(response.status_code, 200)
+        detail = response.json()
+        self.assertEqual(detail["name"], "my widget")
+  </code></pre>
+            <div class="pointover" style="right: 1rem; top: 35%;">👈 Arrange</div>
+            <div class="pointover" style="right: -1rem; top: 64%;">👈 Act</div>
+            <div class="pointover" style="right: 3rem; bottom: 1rem;">👈  Assert</div>
+          </div>
+          <aside class="notes">
+            Tests should be formatted in three different sections:
+            1. You arrange the objects on which your test depends
+            2. You act on those objects;
+            3. You assert that your action caused the desired effect.
+          </aside>
+        </section>
+        <section>
+          <h3>Converting to pytest</h3>
+        </section>
+        <section>
+          <h3>Create our fixtures (arrange)</h3>
+          <pre><code data-trim data-noescape>
+@pytest.fixture
+def api_client() -> APIClient:
+    return APIClient()
+
+@pytest.fixture
+def django_user(django_user_model) -> User:
+    return django_user_model.objects.create_user("test")
+
+@pytest.fixture
+def auth_client(
+    api_client: APIClient, django_user: User
+) -> APIClient:
+    api_client.force_authenticate(django_user)
+    return api_client
+
+@pytest.fixture
+def widget() -> Widget:
+    return Widget.objects.create(name="my widget")
+  </code></pre>
+        </section>
+        <section>
+          <h3>Our converted test</h3>
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == widget.name
+  </code></pre>
+        </section>
+
+        <section>
+          <div style="position: relative;">
+            <pre><code data-trim data-noescape>
+  def test_get(auth_client: APIClient, widget: Widget) -> None:
+      response = self.client.get(f"/api/widgets/{widget.pk}")
+
+      assert response.status_code == 200
+      detail = response.json()
+      assert detail["name"] == widget.name
+    </code></pre>
+            <div class="pointover" style="top: 2rem; left: 35%;">☝️ Arrange</div>
+            <div class="pointover" style="right: 1rem; top: 18%;">👈 Act</div>
+            <div class="pointover" style="right: 20%; bottom: 2rem;">👈  Assert</div>
+          </div>
+          <aside class="notes">
+            Note that all of the arrange code is moved into the parameter list.
+            Pytest fixtures allows us to *reuse* all of the setup code.
+
+            This also fits another good maxim to remember when writing tests:
+            good tests should only change if the behavior changes, not if the
+            setup code changes.
+          </aside>
+        </section>
+        <section>
+          <h3>Lessons from converting an entire codebase</h3>
+        </section>
+        <section>
+          <ul>
+            <li class="fragment fade-in-then-semi-out">Not all setup can be fixtures</li>
+            <li class="fragment fade-in-then-semi-out">You may not get fewer total lines of code</li>
+            <li class="fragment fade-in-then-semi-out">Your tests get more focused</li>
+            <li class="fragment fade-in-then-semi-out">Mocks and fixtures: 👌</li>
+            <li class="fragment fade-in-then-semi-out"><code>pytest.mark.parametrize</code> 💪</li>
+          </ul>
+          <aside class="notes">
+            <ol>
+              <li>Complex setup may still be in the test body</li>
+              <li>You may not see a reduction in <strong>lines</strong> of code</li>
+              <li>
+                Your tests get more focused -- in the past I've written tests
+                that do too much because you don't want to reuse/repeat setup code.
+                It's easier to create small, reusable bits of setup code, and
+                so it makes it easier to write, smaller, more focused tests.
+                You end up having less code *in each individual test*, and
+                you may end up having *more tests*.
+                It's the Simpsons' paradox of testing.
+              </li>
+              <li>
+                Setup only had to be modified in one place -- again, the
+                test doesn't change if the behavior doesn't change.
+              </li>
+              <li>
+                Be sure to explain what mocks are.
+              </li>
+            </ol>
+          </aside>
+        </section>
+        <section>
+          <h3>Property-based testing</h3>
+        </section>
+        <section data-transition="slide-in none">
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == widget.name
+  </code></pre>
+          <aside class="notes">
+            In this previous test, we only had one example of a name.
+          </aside>
+        </section>
+        <section data-transition="none none">
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == ""
+  </code></pre>
+          <aside class="notes">
+            However, we'd like to be able to test against numerous
+            examples, such as the empty string.
+          </aside>
+        </section>
+        <section data-transition="none slide-out">
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == "𦀍\U000c51e1.\U0007c6f3犻/"
+  </code></pre>
+          <aside class="notes">
+            ...or uncommon inputs. That's what property-based testing does for you.
+          </aside>
+        </section>
+        <section>
+          <h3>Hypothesis</h3>
+          <p><a href="https://hypothesis.works/">https://hypothesis.works/</a></p>
+          <aside class="notes">
+            When doing property-based testing in Python, the goto library
+            is called Hypothesis.
+            How many of you have heard of Hypothesis?
+          </aside>
+        </section>
+        <section>
+          <p class="fragment fade-in-then-semi-out">You decide what guarantees your code should make</p>
+          <p class="fragment fade-in-then-semi-out">Express those as tests</p>
+          <p class="fragment fade-in-then-semi-out">Let hypothesis generate possible cases</p>
+          <aside class="notes">
+            Instead of writing single examples, you write tests that
+            make statements about how the code *should* work, and hypothesis
+            generates examples that verify those statements.
+          </aside>
+        </section>
+        <section>
+          <h3>A real world example</h3>
+          <aside class="notes">
+            A lot of introductions to hypothesis start by testing
+            things like an "add" function. When I first started to use
+            hypothesis, I found it difficult to take simple examples like
+            addition and see how they applied to my tests.
+            So this example is a bit complex, but hopefully it gives
+            you a good way of approaching testing real code.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def batcher(seq: Sequence[T], n: int) -> Iterator[Sequence[T]]:
+    """
+    Collect data into fixed-length chunks or blocks
+    """
+    start = 0
+    slice = seq[start:n]
+    while slice:
+        yield slice
+        start += n
+        slice = seq[start : start + n]
+  </code></pre>
+        </section>
+        <section>
+          <p>
+            Given the function's input, <br/>what can we say about its output?
+          </p>
+          <p>
+            What guarantees do we want to check?
+          </p>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_batcher() -> None:
+    """
+    Given a list, it returns the same number of
+    items in that list.
+    """
+  </code></pre>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+from hypothesis import given, strategies as st
+
+@given(seq=st.lists(st.integers()))
+def test_batcher(seq: List) -> None:
+    """
+    Given a list, it returns the same number of
+    items in that list.
+    """
+    result = batcher(seq, 2)
+    total = sum(len(batch) for batch in result)
+    assert len(seq) == total
+  </code></pre>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+widget/tests/test_utils.py::test_batcher Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[26330,
+ -2113,
+ -7680742127399325684,
+ 16759,
+...
+ 14791])
+Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[21629, 118])
+Trying example: test_batcher(seq=[3084, -23448, -2122764798, -85, 1979117107])
+Trying example: test_batcher(seq=[-16460, 1911939345])
+Trying example: test_batcher(seq=[-11521, 22559, -1209160822, 21397])
+Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[-32228])
+Trying example: test_batcher(seq=[13282, -19446, -34, -40, 7345, 27125])
+Trying example: test_batcher(seq=[-31486, -13218])
+Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[-15321, -7414])
+Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[])
+Trying example: test_batcher(seq=[-127, -87, 3858, 24])
+Trying example: test_batcher(seq=[-32767, -13186, 0])
+Trying example: test_batcher(seq=[-32767])
+... any many more
+  </code></pre>
+          <aside class="notes">
+            It will repeatedly run this test with different inputs --
+            for this test, it runs 100 examples.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_batcher_inverse() -> None:
+    """
+    Given a list, it returns the items in that list.
+    """
+  </code></pre>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+from hypothesis import given, strategies as st
+from itertools import chain
+
+@given(seq=st.lists(st.integers()))
+def test_batcher_inverse(seq: List) -> None:
+    """
+    Given a list, it returns the items in that list.
+    """
+    result = batcher(seq, 2)
+    flat = list(chain.from_iterable(result))
+    assert seq == flat
+  </code></pre>
+        </section>
+        <section>
+          <h3>Given this, assert that</h3>
+          <aside class="notes">
+            This is a good way of thinking about designing
+            property-based tests. Think about what, given
+            certain inputs, should hold true as a *logical
+            consquence* of those inputs.
+          </aside>
+        </section>
+        <section>
+          <h3>"propositional calculus"</h3>
+          <aside class="notes">
+            If you want to sound nerdy, you can use the
+            term propositional calculus. You are creating
+            statements that logically hold true given certain axioms.
+
+            And as it turns out, this is also a great way to
+            think about your example-based tests.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == widget.name
+</code></pre>
+          <aside class="notes">
+            Going back to our API test again, you can see that
+            we forgot to add a docstring.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_get() -> None:
+    """
+    Given a widget and an authorized user,
+    you can GET it from the API
+    """
+</code></pre>
+          <aside class="notes">
+            This is how I could have approached writing this test --
+            I think it's actually best to start with writing your
+            docstring like this, to explain what your test depends on,
+            and what it's trying to test.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    """
+    Given a widget and an authorized user,
+    you can GET it from the API
+    """
+</code></pre>
+          <aside class="notes">
+            By documenting your test this way, you define the inputs
+            and outputs of your test -- that is, you define
+            what you need to arrange, act and assert on.
+
+            Then I can say, "ok, I will need these fixtures.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    """
+    Given a widget and an authorized user,
+    you can GET it from the API
+    """
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == widget.name
+</code></pre>
+          <aside class="notes">
+            Finally, I can write my test.
+          </aside>
+        </section>
+        <section>
+          <pre><code data-trim data-noescape>
+from hypothesis import given
+from .strategies import widgets
+
+@given(widget=widgets())
+def test_get(auth_client: APIClient, widget: Widget) -> None:
+    """
+    Given a widget and an authorized user,
+    you can GET it from the API
+    """
+    response = self.client.get(f"/api/widgets/{widget.pk}")
+
+    assert response.status_code == 200
+    detail = response.json()
+    assert detail["name"] == widget.name
+</code></pre>
+          <aside class="notes">
+            If we wanted to, we could write a strategy to create
+            widgets, and let hypothesis generate them.
+
+            What makes this possible is that we first thought about
+            what our test is expressing as a function of its
+            inputs and outputs, using logical statements.
+
+            This makes it easy to write more focused, more self-describing,
+            more fluent tests.
+          </aside>
+        </section>
+        <section>
+          <h3>Questions</h3>
+        </section>
+        <section>
+          What if I don't use pytest?
+          <aside class="notes">
+            TODO: Be sure to mention other unit tests besides Django,
+            like unittest or nose. If you don't want to use pytest,
+            you can still use hypothesis.
+          </aside>
+        </section>
+        <section>
+          Do I have to convert all my tests<br/>to property-based tests?
+          <aside class="notes">
+            Absolutely not. There are some tests that don't necessarily fit
+            well with the model. In addition, example-based testing can be
+            just as useful for readability in complex tests. You can have
+            an example based test alongside a property based test.
+
+            Writing property-based tests takes time: you have to weigh
+            the costs of those tests with how much the test it worth.
+
+            In my experience, the best cases for property-based tests are
+            "pure" functions, or truly "unit" tests. Higher-level integration
+            tests like the API example above may not be as useful.
+          </aside>
+        </section>
+        <section>
+          <h3>Next steps</h3>
+        </section>
+        <section>
+          <h3>Hypothesis for:</h3>
+          <p>data science</p>
+          <p>mocking</p>
+        </section>
+        <section>
+          <p>
+            Hypothesis and contracts:<br/>
+            <a href="https://hillelwayne.com/talks/beyond-unit-tests/">
+              https://hillelwayne.com/talks/beyond-unit-tests/
+            </a>
+          </p>
+          <p>
+            How to come up with properties:<br/>
+            <a href="https://fsharpforfunandprofit.com/posts/property-based-testing-2/">
+              https://fsharpforfunandprofit.com/posts/property-based-testing-2/
+            </a>
+          </p>
+          <p>
+            Caveat:<br/>
+            <a href="https://github.com/pytest-dev/pytest/issues/916">
+              https://github.com/pytest-dev/pytest/issues/916
+            </a>
+          </p>
+        </section>
+        <section>
+          <h3>Acknowledgements</h3>
+          <p>Mariatta Wijaya</p>
+          <p>Don Sheu</p>
+          <p>Dustin Ingram</p>
+          <p>Russell Duhon</p>
+          <p>Cris Ewing</p>
+          <p>Alan Vezina</p>
+          <p>Maelle Vance</p>
+          <aside class="notes">
+            <ul>
+              <li>Mariatta for helping me with my CFP and organizing the conference</li>
+              <li>Dustin for helping me improve this</li>
+              <li>Russell is literally writing the book on Hypothesis</li>
+              <li>Cris inspired me to convert my Django project to pytest</li>
+              <li>
+                Alan and Maelle for inspiring me to submit a talk and being
+                all around awesome people.
+              </li>
+              <li>
+                Also all of the PyCascades volunteers
+              </li>
+            </ul>
+          </aside>
+        </section>
+        <section>
+          <h3>Thank you</h3>
+        </section>
+      </div>
+    </div>
+
+    <script src="lib/js/head.min.js"></script>
+    <script src="js/reveal.js"></script>
+
+    <script>
+      // More info about config & dependencies:
+      // - https://github.com/hakimel/reveal.js#configuration
+      // - https://github.com/hakimel/reveal.js#dependencies
+      Reveal.initialize({
+        history: true,
+        dependencies: [
+          { src: 'plugin/markdown/marked.js' },
+          { src: 'plugin/markdown/markdown.js' },
+          { src: 'plugin/notes/notes.js', async: true },
+          { src: 'plugin/highlight/highlight.js', async: true, callback: function() { hljs.initHighlightingOnLoad(); } }
+        ]
+      });
+    </script>
+  </body>
 </html>
